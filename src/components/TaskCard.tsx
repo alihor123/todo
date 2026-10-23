@@ -1,5 +1,7 @@
+import { Check } from '@/assets/icons'
 import { timeFormating } from '@/helpers/timeFormating'
 import { useStyles } from '@/hooks/useStyles'
+import { Image } from 'expo-image'
 import { Pressable, Text, View } from 'react-native'
 
 type TaskCardProps = {
@@ -8,9 +10,13 @@ type TaskCardProps = {
     isCompleted: boolean
     createdAt: string
   }
+  disabled: boolean
+  onCheck: () => void
+  onEdit: () => void
+  onDelete: () => void
 }
 
-export function TaskCard({ task }: TaskCardProps) {
+export function TaskCard({ task, disabled, onCheck, onEdit, onDelete }: TaskCardProps) {
   const styles = useStyles((colors) => ({
     task: {
       padding: 16,
@@ -38,10 +44,10 @@ export function TaskCard({ task }: TaskCardProps) {
       borderColor: colors.primary,
       backgroundColor: colors.primary
     },
-    taskCheckmark: {
-      fontSize: 15,
-      fontWeight: '600',
-      color: colors.onPrimary
+    taskCheckIcon: {
+      width: 16,
+      height: 16,
+      tintColor: colors.onPrimary
     },
     taskContent: {
       flex: 1,
@@ -91,14 +97,22 @@ export function TaskCard({ task }: TaskCardProps) {
   }))
 
   return (
-    <View style={[styles.task, task.isCompleted && styles.taskCompleted]}>
+    <Pressable
+      onPress={onCheck}
+      disabled={disabled}
+      style={({ pressed }) => [styles.task, task.isCompleted && styles.taskCompleted, pressed && styles.buttonPressed]}
+    >
       <View style={styles.taskHeader}>
-        <Pressable
-          hitSlop={10}
-          style={({ pressed }) => [styles.taskCheckbox, task.isCompleted && styles.taskCheckboxCompleted, pressed && styles.buttonPressed]}
-        >
-          {task.isCompleted && <Text style={styles.taskCheckmark}>✓</Text>}
-        </Pressable>
+        <View style={[styles.taskCheckbox, task.isCompleted && styles.taskCheckboxCompleted]}>
+          {task.isCompleted && (
+            <Image
+              source={Check}
+              style={styles.taskCheckIcon}
+              tintColor={styles.taskCheckIcon.tintColor}
+              contentFit="contain"
+            />
+          )}
+        </View>
 
         <View style={styles.taskContent}>
           <Text style={[styles.taskTitle, task.isCompleted && styles.taskTitleCompleted]}>
@@ -112,16 +126,26 @@ export function TaskCard({ task }: TaskCardProps) {
 
       <View style={styles.taskActions}>
         <Pressable
+          onPress={event => {
+            event.stopPropagation()
+            onEdit()
+          }}
+          disabled={disabled}
           style={({ pressed }) => [styles.taskActionButton, pressed && styles.buttonPressed]}
         >
           <Text style={styles.taskEditText}>Изменить</Text>
         </Pressable>
         <Pressable
+          onPress={event => {
+            event.stopPropagation()
+            onDelete()
+          }}
+          disabled={disabled}
           style={({ pressed }) => [styles.taskActionButton, pressed && styles.buttonPressed]}
         >
           <Text style={styles.taskDeleteText}>Удалить</Text>
         </Pressable>
       </View>
-    </View>
+    </Pressable>
   )
 }

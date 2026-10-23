@@ -1,37 +1,25 @@
 import { Plus } from '@/assets/icons'
 import { TaskCard } from '@/components/TaskCard'
+import TaskModal, { type ModalOpen } from '@/components/TaskModal'
+import { showMessage } from '@/helpers/showMessage'
 import { useStyles } from '@/hooks/useStyles'
+import AsyncStorage from '@react-native-async-storage/async-storage'
+import { BlurTargetView } from 'expo-blur'
+import { randomUUID } from 'expo-crypto'
 import { Image } from 'expo-image'
-import { Pressable, ScrollView, Text, TextInput, View } from 'react-native'
+import { useEffect, useRef, useState } from 'react'
+import {
+  ActivityIndicator, Pressable, ScrollView, Text, TextInput, View, type ViewInstance
+} from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
-// Тестовые задачи для вёрстки экрана
-const mockTasks = [
-  {
-    id: '1',
-    title: 'Подготовить отчёт по лабораторной работе',
-    isCompleted: false,
-    createdAt: '2026-10-23T08:30:00.000Z'
-  },
-  {
-    id: '2',
-    title: 'Повторить работу с состоянием в React',
-    isCompleted: false,
-    createdAt: '2026-10-23T09:15:00.000Z'
-  },
-  {
-    id: '3',
-    title: 'Проверить конвертер валют на телефоне',
-    isCompleted: true,
-    createdAt: '2026-10-22T16:45:00.000Z'
-  },
-  {
-    id: '4',
-    title: 'Сделать калькулятор',
-    isCompleted: true,
-    createdAt: '2026-10-21T10:00:00.000Z'
-  }
-]
+type Task = {
+  title: string
+  isCompleted: boolean
+  createdAt: string
+}
+
+type Tasks = Record<string, Task>
 
 const filters = [
   { name: 'Все', value: null },
@@ -46,6 +34,7 @@ export default function Index() {
       backgroundColor: colors.background
     },
     content: {
+      flexGrow: 1,
       width: '100%',
       maxWidth: 600,
       alignSelf: 'center',
@@ -63,6 +52,11 @@ export default function Index() {
     wrapper: {
       width: '100%',
       gap: 10
+    },
+    emptyTasks: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center'
     },
     label: {
       fontSize: 16,
@@ -127,57 +121,315 @@ export default function Index() {
       height: 28,
       tintColor: colors.onPrimary
     },
+    tasksStatus: {
+      flex: 1,
+      padding: 24,
+      gap: 20,
+      alignItems: 'center',
+      justifyContent: 'center'
+    },
+    tasksLoader: {
+      color: colors.primary
+    },
+    retryButton: {
+      minHeight: 44,
+      paddingHorizontal: 24,
+      paddingVertical: 10,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: 999,
+      backgroundColor: colors.primary
+    },
+    retryButtonText: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: colors.onPrimary
+    },
+    resultMessage: {
+      fontSize: 16,
+      color: colors.textSecondary,
+      textAlign: 'center'
+    },
     buttonPressed: {
       opacity: 0.6
     }
   }))
 
-  return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.container}>
-        <ScrollView contentContainerStyle={styles.content}>
-          <Text style={styles.title}>Список задач</Text>
+  const [tasks, setTasks] = useState<Tasks>({})
+  const [modalOpen, setModalOpen] = useState<ModalOpen>(null)
+  const [taskTitle, setTaskTitle] = useState('')
+  const [search, setSearch] = useState('')
+  const [filter, setFilter] = useState<boolean | null>(null)
+  const [isTasksLoading, setIsTasksLoading] = useState(true)
+  const [isTaskSaving, setIsTaskSaving] = useState(false)
+  const [isTasksLoadError, setIsTasksLoadError] = useState(false)
+  const blurTargetRef = useRef<ViewInstance | null>(null)
 
-          <View style={styles.wrapper}>
-            <Text style={styles.label}>Поиск</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Найти задачу по названию"
-              placeholderTextColor={styles.inputPlaceholder.color}
-              editable={false}
-            />
-          </View>
+  const filteredTasks = filter !== null
+    ? Object.entries(tasks).filter(([, task]) => task.isCompleted === filter)
+    : Object.entries(tasks)
 
-          <View style={styles.filters}>
-            {filters.map(filter => (
+  const searchedTasks = filteredTasks.filter(([, task]) =>
+    task.title.toLowerCase().includes(search.trim().toLowerCase())
+  )
+
+  // Загрузка данных из стораджа при запуске и повторной попытке
+  async function loadTasks() {
+    setIsTasksLoading(true)
+    setIsTasksLoadError(false)
+
+    try {
+      const value = await AsyncStorage.getItem('tasks')
+      const data = value ? JSON.parse(value) : {}
+
+      setTasks(data)
+    }
+    catch {
+      setIsTasksLoadError(true)
+    }
+    finally {
+      setIsTasksLoading(false)
+    }
+  }
+
+  // Первоначальная загрузка данных при открытии приложения
+  useEffect(() => {
+    void loadTasks()
+  }, [])
+
+  //Открытие окна создания записи
+  function openCreateModal() {
+    if (isTaskSaving) return
+
+    setTaskTitle('')
+    setModalOpen({ type: 'create' })
+  }
+
+  //Открытие окна редактирования записи
+  function openEditModal(id: string) {
+    if (isTaskSaving || !tasks[id]) return
+
+    setTaskTitle(tasks[id].title)
+    setModalOpen({ type: 'edit', id })
+  }
+
+  //Открытие окна удаления записи
+  function openDeleteModal(id: string) {
+    if (isTaskSaving || !tasks[id]) return
+
+    setTaskTitle(tasks[id].title)
+    setModalOpen({ type: 'delete', id })
+  }
+
+  //Закрытие окна
+  function closeModal() {
+
+    setModalOpen(null)
+    setTaskTitle('')
+  }
+
+  //Создание задачи
+  async function createTask() {
+    if (isTaskSaving || !taskTitle.trim()) return
+
+    setIsTaskSaving(true)
+
+    try {
+      const id = randomUUID()
+      const newTasks = {
+        ...tasks,
+        [id]: {
+          title: taskTitle.trim(),
+          isCompleted: false,
+          createdAt: new Date().toISOString()
+        }
+      }
+
+      await AsyncStorage.setItem('tasks', JSON.stringify(newTasks))
+      setTasks(newTasks)
+      closeModal()
+    }
+    catch {
+      showMessage('Не удалось добавить задачу')
+    }
+    finally {
+      setIsTaskSaving(false)
+    }
+  }
+
+  //Редактирование задачи
+  async function editTask() {
+    if (isTaskSaving || modalOpen?.type !== 'edit' || !taskTitle.trim()) return
+
+    setIsTaskSaving(true)
+
+    try {
+      const id = modalOpen.id
+      const newTasks = {
+        ...tasks,
+        [id]: { ...tasks[id], title: taskTitle.trim() }
+      }
+
+      await AsyncStorage.setItem('tasks', JSON.stringify(newTasks))
+      setTasks(newTasks)
+      closeModal()
+    }
+    catch {
+      showMessage('Не удалось изменить задачу')
+    }
+    finally {
+      setIsTaskSaving(false)
+    }
+  }
+
+  //Удаление
+  async function deleteTask() {
+    if (isTaskSaving || modalOpen?.type !== 'delete') return
+
+    setIsTaskSaving(true)
+
+    try {
+      const newTasks = { ...tasks }
+      delete newTasks[modalOpen.id]
+
+      await AsyncStorage.setItem('tasks', JSON.stringify(newTasks))
+      setTasks(newTasks)
+      closeModal()
+    }
+    catch {
+      showMessage('Не удалось удалить задачу')
+    }
+    finally {
+      setIsTaskSaving(false)
+    }
+  }
+
+  //Отметка выполненным
+  async function checkTask(id: string) {
+    if (isTaskSaving || !tasks[id]) return
+
+    setIsTaskSaving(true)
+
+    try {
+      const newTasks = {
+        ...tasks,
+        [id]: { ...tasks[id], isCompleted: !tasks[id].isCompleted }
+      }
+
+      await AsyncStorage.setItem('tasks', JSON.stringify(newTasks))
+      setTasks(newTasks)
+    }
+    catch {
+      showMessage('Не удалось изменить статус задачи')
+    }
+    finally {
+      setIsTaskSaving(false)
+    }
+  }
+
+  if (isTasksLoading || isTasksLoadError) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.tasksStatus}>
+          {isTasksLoading ? (
+            <ActivityIndicator size="large" color={styles.tasksLoader.color} />
+          ) : (
+            <>
+              <Text style={styles.resultMessage}>Не удалось загрузить задания</Text>
               <Pressable
-                key={filter.name}
-                style={({ pressed }) => [styles.filterButton, pressed && styles.buttonPressed]}
+                onPress={loadTasks}
+                style={({ pressed }) => [styles.retryButton, pressed && styles.buttonPressed]}
               >
-                <Text style={[styles.filterButtonText]}>
-                  {filter.name}
-                </Text>
+                <Text style={styles.retryButtonText}>Повторить</Text>
               </Pressable>
-            ))}
-          </View>
+            </>
+          )}
+        </View>
+      </SafeAreaView>
+    )
+  }
 
-          <View style={styles.wrapper}>
-            {mockTasks.map(task => (
-              <TaskCard key={task.id} task={task} />
-            ))}
+  return (
+    <>
+      <BlurTargetView ref={blurTargetRef} style={styles.container}>
+        <SafeAreaView style={styles.container}>
+          <View style={styles.container}>
+            <ScrollView contentContainerStyle={styles.content}>
+              <Text style={styles.title}>Список задач</Text>
+
+              <View style={styles.wrapper}>
+                <Text style={styles.label}>Поиск</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Найти задачу по названию"
+                  placeholderTextColor={styles.inputPlaceholder.color}
+                  value={search}
+                  onChangeText={setSearch}
+                />
+              </View>
+
+              <View style={styles.filters}>
+                {filters.map(item => (
+                  <Pressable
+                    key={item.name}
+                    onPress={() => setFilter(item.value)}
+                    style={({ pressed }) => [styles.filterButton, filter === item.value && styles.filterButtonActive, pressed && styles.buttonPressed]}
+                  >
+                    <Text style={[styles.filterButtonText, filter === item.value && styles.filterButtonTextActive]}>
+                      {item.name}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+
+              {searchedTasks.length === 0 ? (
+                <View style={styles.emptyTasks}>
+                  <Text style={styles.resultMessage}>
+                    {Object.keys(tasks).length === 0 ? 'Задач пока нет' : 'Ничего не найдено'}
+                  </Text>
+                </View>
+              ) : (
+                <View style={styles.wrapper}>
+                  {searchedTasks.map(([id, task]) => (
+                    <TaskCard
+                      key={id}
+                      task={task}
+                      disabled={isTaskSaving}
+                      onCheck={() => checkTask(id)}
+                      onEdit={() => openEditModal(id)}
+                      onDelete={() => openDeleteModal(id)}
+                    />
+                  ))}
+                </View>
+              )}
+            </ScrollView>
+            <Pressable
+              onPress={openCreateModal}
+              disabled={isTaskSaving}
+              style={({ pressed }) => [styles.addButton, pressed && styles.buttonPressed]}
+            >
+              <Image
+                source={Plus}
+                style={styles.addIcon}
+                tintColor={styles.addIcon.tintColor}
+                contentFit="contain"
+              />
+            </Pressable>
           </View>
-        </ScrollView>
-        <Pressable
-          style={({ pressed }) => [styles.addButton, pressed && styles.buttonPressed]}
-        >
-          <Image
-            source={Plus}
-            style={styles.addIcon}
-            tintColor={styles.addIcon.tintColor}
-            contentFit="contain"
-          />
-        </Pressable>
-      </View>
-    </SafeAreaView>
+        </SafeAreaView>
+      </BlurTargetView>
+
+      <TaskModal
+        modalOpen={modalOpen}
+        taskTitle={taskTitle}
+        isTaskSaving={isTaskSaving}
+        blurTarget={blurTargetRef}
+        onChangeTitle={setTaskTitle}
+        onCreate={createTask}
+        onEdit={editTask}
+        onDelete={deleteTask}
+        onClose={closeModal}
+      />
+    </>
   )
 }

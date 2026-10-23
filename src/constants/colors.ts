@@ -5,6 +5,7 @@ export const Colors = {
     text: '#1E293B',
     border: '#E8EDF4',
     error: '#D70015',
+    overlay: 'rgba(0, 0, 0, 0.18)',
 
     surface: '#FFFFFF',
     onSurface: '#1E293B',
@@ -25,6 +26,7 @@ export const Colors = {
     text: '#F1F5F9',
     border: '#2B3749',
     error: '#FF453A',
+    overlay: 'rgba(0, 0, 0, 0.25)',
 
     surface: '#182231',
     onSurface: '#F1F5F9',

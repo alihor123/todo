@@ -1,7 +1,7 @@
 import { Colors } from '@/constants/colors'
-import { StyleSheet, useColorScheme } from 'react-native'
+import { StyleSheet, useColorScheme, type ImageStyle, type TextStyle, type ViewStyle } from 'react-native'
 
-export function useStyles<T extends StyleSheet.NamedStyles<T>>(createStyles: (colors: typeof Colors.light) => T) {
+export function useStyles<T extends Record<string, ViewStyle | TextStyle | ImageStyle>>(createStyles: (colors: typeof Colors.light) => T) {
   const theme = useColorScheme()
   const colors = theme === 'dark' ? Colors.dark : Colors.light
 
