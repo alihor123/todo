@@ -1,7 +1,7 @@
 import { useStyles } from '@/hooks/useStyles'
 import { BlurView } from 'expo-blur'
 import type { RefObject } from 'react'
-import { KeyboardAvoidingView, Modal, Platform, Pressable, Text, View, type TextStyle, type ViewInstance, type ViewStyle } from 'react-native'
+import { Modal, Pressable, Text, View, type TextStyle, type ViewInstance, type ViewStyle } from 'react-native'
 import { CreateTaskContent } from './CreateTaskContent'
 import { DeleteTaskContent } from './DeleteTaskContent'
 import { EditTaskContent } from './EditTaskContent'
@@ -192,8 +192,7 @@ export default function TaskModal({ modalOpen, taskTitle, isTaskSaving, blurTarg
           disabled={isTaskSaving}
           style={[styles.modalBackground, styles.modalOverlay]}
         />
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        <View
           pointerEvents="box-none"
           style={styles.modalWrapper}
         >
@@ -201,7 +200,7 @@ export default function TaskModal({ modalOpen, taskTitle, isTaskSaving, blurTarg
             <Text style={styles.modalTitle}>{modalTitles[modalOpen?.type ?? 'create']}</Text>
             {getModalContent()}
           </View>
-        </KeyboardAvoidingView>
+        </View>
       </View>
     </Modal>
   )
