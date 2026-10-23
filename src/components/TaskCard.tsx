@@ -1,5 +1,5 @@
 import { Check } from '@/assets/icons'
-import { timeFormating } from '@/helpers/timeFormating'
+import { timeFormating } from '@/helpers'
 import { useStyles } from '@/hooks/useStyles'
 import { Image } from 'expo-image'
 import { Pressable, Text, View } from 'react-native'

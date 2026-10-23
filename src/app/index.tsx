@@ -1,7 +1,7 @@
 import { Plus } from '@/assets/icons'
 import { TaskCard } from '@/components/TaskCard'
 import TaskModal, { type ModalOpen } from '@/components/TaskModal'
-import { showMessage } from '@/helpers/showMessage'
+import { showMessage } from '@/helpers'
 import { useStyles } from '@/hooks/useStyles'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { BlurTargetView } from 'expo-blur'
@@ -194,7 +194,7 @@ export default function Index() {
 
   // Первоначальная загрузка данных при открытии приложения
   useEffect(() => {
-    void loadTasks()
+    loadTasks()
   }, [])
 
   //Открытие окна создания записи
@@ -207,7 +207,7 @@ export default function Index() {
 
   //Открытие окна редактирования записи
   function openEditModal(id: string) {
-    if (isTaskSaving || !tasks[id]) return
+    if (isTaskSaving) return
 
     setTaskTitle(tasks[id].title)
     setModalOpen({ type: 'edit', id })
@@ -215,7 +215,7 @@ export default function Index() {
 
   //Открытие окна удаления записи
   function openDeleteModal(id: string) {
-    if (isTaskSaving || !tasks[id]) return
+    if (isTaskSaving) return
 
     setTaskTitle(tasks[id].title)
     setModalOpen({ type: 'delete', id })
